@@ -1,0 +1,15 @@
+body { font-family: system-ui, Arial; margin:0; padding:0; display:flex; justify-content:center; align-items:center; min-height:100vh; background:#f4f5f7 }
+.app-root { width:100%; max-width:880px; margin:20px; }
+.create-join, .chat-root { background:#fff; padding:16px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.06) }
+.create-join input, .composer input { padding:8px; margin:6px 0; width:100%; box-sizing:border-box }
+.group { margin-top:8px }
+.messages { height:400px; overflow:auto; border:1px solid #eee; padding:8px; margin:8px 0; border-radius:6px; background:#fafafa }
+.msg { margin:6px 0 }
+.msg-system { color:#666; font-style:italic; margin:6px 0 }
+.header { display:flex; justify-content:space-between; align-items:center }
+.controls button { margin-left:8px }
+.composer { display:flex; gap:8px }
+.composer input { flex:1 }
+.status { margin-top:8px; color:#b00 }
+.error { color:#b00 }
+.hint { color:#666; font-size:13px }
