@@ -12,4 +12,4 @@ body { font-family: system-ui, Arial; margin:0; padding:0; display:flex; justify
 .composer input { flex:1 }
 .status { margin-top:8px; color:#b00 }
 .error { color:#b00 }
-.hint { color:#666; font-size:13px }
+.hint { color:#666; font-size:13px }  
