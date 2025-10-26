@@ -225,7 +225,7 @@ export default function CreateJoin({ onEnter }) {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 mb-2">
               <MessageSquare className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white">Whisper</h1>
+            <h1 className="text-3xl font-bold text-white">Whisprr</h1>
             <p className="text-gray-400 text-sm">
               Create or join a room instantly — no registration required
             </p>
