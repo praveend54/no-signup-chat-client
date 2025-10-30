@@ -11,10 +11,13 @@ export default function ChatRoom({ roomCode, name, onLeave }) {
   const [status, setStatus] = useState('');
   const [hasLeft, setHasLeft] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isMobileKeyboardOpen, setIsMobileKeyboardOpen] = useState(false);
   const bottomRef = useRef(null);
+  const chatRef = useRef(null);
 
   const username = name || '';
 
+  // Connect socket
   useEffect(() => {
     const s = io(API, { autoConnect: true });
     setSocket(s);
@@ -30,42 +33,41 @@ export default function ChatRoom({ roomCode, name, onLeave }) {
       });
     });
 
-    s.on('disconnect', () => {
-      setIsConnected(false);
-    });
-
-    s.on('new-message', (m) => {
-      setMessages((prev) => [...prev, m]);
-    });
-
-    s.on('user-joined', ({ name: who }) => {
-      setMessages((prev) => [...prev, { system: true, text: `${who} joined` }]);
-    });
-
-    s.on('user-left', ({ name: who }) => {
-      setMessages((prev) => [...prev, { system: true, text: `${who} left` }]);
-    });
-
+    s.on('disconnect', () => setIsConnected(false));
+    s.on('new-message', (m) => setMessages((prev) => [...prev, m]));
+    s.on('user-joined', ({ name: who }) => setMessages((p) => [...p, { system: true, text: `${who} joined` }]));
+    s.on('user-left', ({ name: who }) => setMessages((p) => [...p, { system: true, text: `${who} left` }]));
     s.on('room-ended', () => {
       setStatus('Room ended by host.');
       setTimeout(() => onLeave(), 1200);
     });
 
     return () => {
-      try { s.disconnect(); } catch (e) {}
+      try { s.disconnect(); } catch {}
     };
   }, [roomCode, name, onLeave]);
 
+  // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  function send() {
-    if (hasLeft) return;
-    if (!text.trim()) return;
-    if (!socket || !socket.connected) return;
+  // Detect mobile keyboard visibility
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerHeight < 500) {
+        setIsMobileKeyboardOpen(true);
+      } else {
+        setIsMobileKeyboardOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-    socket.emit('send-message', { code: roomCode, name, text }, () => {});
+  function send() {
+    if (hasLeft || !text.trim() || !socket?.connected) return;
+    socket.emit('send-message', { code: roomCode, name, text });
     setText('');
   }
 
@@ -74,8 +76,8 @@ export default function ChatRoom({ roomCode, name, onLeave }) {
     setHasLeft(true);
     setStatus('You left the room.');
     if (socket) {
-      try { socket.emit('leave-room', { code: roomCode, name }); } catch (e) {}
-      try { socket.disconnect(); } catch (e) {}
+      try { socket.emit('leave-room', { code: roomCode, name }); } catch {}
+      try { socket.disconnect(); } catch {}
     }
     setTimeout(() => onLeave(), 200);
   }
@@ -89,14 +91,12 @@ export default function ChatRoom({ roomCode, name, onLeave }) {
 
   return (
     <div className="h-screen w-full bg-[#0b141a] flex flex-col">
-      {/* WhatsApp-style Header */}
-      <div className="bg-[#202c33] px-4 py-3 flex items-center justify-between shadow-lg">
+      {/* Header */}
+      <div className="bg-[#202c33] px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
         <div className="flex items-center gap-3 flex-1">
-          {/* Group Avatar */}
           <div className="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center text-white font-semibold text-lg">
             {roomCode.charAt(0)}
           </div>
-          
           <div className="flex-1">
             <h2 className="text-white font-medium text-lg tracking-wide">
               Room <span className="font-mono font-bold">{roomCode}</span>
@@ -117,11 +117,12 @@ export default function ChatRoom({ roomCode, name, onLeave }) {
         </button>
       </div>
 
-      {/* Chat Messages Area */}
-      <div 
-        className="flex-1 overflow-y-auto px-4 py-6 relative"
+      {/* Chat Area */}
+      <div
+        ref={chatRef}
+        className="flex-1 overflow-y-auto px-4 py-6 relative scroll-smooth"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           backgroundColor: '#0b141a'
         }}
       >
@@ -138,40 +139,23 @@ export default function ChatRoom({ roomCode, name, onLeave }) {
             }
 
             const senderName = msg.name ?? msg.sender ?? '';
-            const isOwn = username ? (senderName === username) : false;
-            const displayName = isOwn ? 'You' : (senderName || msg.displayName || 'Unknown');
-            const time = msg.time || msg.createdAt || msg.timestamp || 
-              new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const isOwn = senderName === username;
+            const displayName = isOwn ? 'You' : (senderName || 'Unknown');
+            const time = msg.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             return (
-              <div
-                key={index}
-                className={`flex mb-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={index} className={`flex mb-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[65%] rounded-lg px-3 py-2 shadow-md ${
-                    isOwn
-                      ? 'bg-[#005c4b] text-white'
-                      : 'bg-[#202c33] text-[#e9edef]'
+                  className={`max-w-[75%] sm:max-w-[65%] md:max-w-[60%] rounded-lg px-3 py-2 shadow-md ${
+                    isOwn ? 'bg-[#005c4b] text-white' : 'bg-[#202c33] text-[#e9edef]'
                   }`}
                 >
                   {!isOwn && (
-                    <div className="text-[#00a884] text-xs font-semibold mb-1">
-                      {displayName}
-                    </div>
+                    <div className="text-[#00a884] text-xs font-semibold mb-1">{displayName}</div>
                   )}
                   <div className="text-sm break-words">{msg.text}</div>
-                  <div className={`text-[10px] mt-1 text-right ${
-                    isOwn ? 'text-[#8696a0]' : 'text-[#8696a0]'
-                  }`}>
+                  <div className="text-[10px] mt-1 text-right text-[#8696a0]">
                     {time}
-                    {isOwn && (
-                      <span className="ml-1">
-                        <svg width="16" height="11" viewBox="0 0 16 11" fill="none" className="inline">
-                          <path d="M11.071 0.929L6 6l1.414 1.414L12.485 2.343 11.07.93zm-5.656 0L.344 6l1.414 1.414L6.829 2.343 5.415.93zM14.899 1.343l-8.485 8.485 1.414 1.415 8.485-8.486-1.414-1.414z" fill="currentColor"/>
-                        </svg>
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -181,15 +165,21 @@ export default function ChatRoom({ roomCode, name, onLeave }) {
         </div>
       </div>
 
-      {/* Status Message */}
+      {/* Status */}
       {status && (
         <div className="px-4 py-2 bg-[#182229] text-center">
           <p className="text-[#8696a0] text-sm">{status}</p>
         </div>
       )}
 
-      {/* Input Area */}
-      <div className="bg-[#202c33] px-4 py-3">
+      {/* Floating Input Area (keyboard-aware on mobile) */}
+      <div
+        className={`px-4 py-3 bg-[#202c33] transition-all duration-300 ${
+          isMobileKeyboardOpen
+            ? 'fixed bottom-0 left-0 w-full z-50'
+            : 'relative'
+        }`}
+      >
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center bg-[#2a3942] rounded-lg px-4 py-2.5">
             <input
